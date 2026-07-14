@@ -1,0 +1,40 @@
+# Large biological data files
+*.fasta
+*.fa
+*.faa
+*.fna
+*.gbff
+*.gz
+
+# AlphaFold large files
+*.cif
+*.pdb
+*.bcif
+
+# DIAMOND databases
+*.dmnd
+
+# NCBI downloads
+data/genomes/
+data/gbff/
+
+# Large AlphaFold database
+data/alphafold/accession_ids.csv
+
+# Temporary files
+*.tmp
+*.log
+
+# macOS
+.DS_Store
+
+# Python
+__pycache__/
+*.pyc
+
+# R
+.Rhistory
+.RData
+
+# Large result tables
+results/redundancy/protein_lengths.tsv
