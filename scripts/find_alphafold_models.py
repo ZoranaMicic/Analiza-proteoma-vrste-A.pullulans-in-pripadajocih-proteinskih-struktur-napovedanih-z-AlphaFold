@@ -4,7 +4,7 @@ input_ids = "results/alphafold/A_pullulans_candidate_uniprot_ids.txt"
 alphafold_db = "data/alphafold/accession_ids.csv"
 output_file = "results/alphafold/alphafold_matches.csv"
 
-# učitaj naših 8224 UniProt accession-a
+# učitaj mojih 8224 UniProt accession-a
 with open(input_ids) as f:
     ids = set(line.strip() for line in f if line.strip())
 
