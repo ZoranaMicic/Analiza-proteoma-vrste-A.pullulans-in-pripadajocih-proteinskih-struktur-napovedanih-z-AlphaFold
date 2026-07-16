@@ -1,0 +1,1095 @@
+---
+title: Analysis of the proteome of Aureobasidium pullulans and associated protein structures predicted by AlphaFold
+author: "Zorana Micic"
+date: "2026-07-09"
+output: 
+  html_document:
+    toc: true
+    toc_float: true
+    number_sections: true
+---
+
+```{r setup, include=FALSE}
+library(Biostrings)
+library(knitr)
+library(rentrez)
+library(dplyr)
+library(ggplot2)
+library(readr)
+library(dplyr)
+library(tidyr)
+library(KEGGREST)
+
+knitr::opts_chunk$set(
+  warning = FALSE,
+  message = FALSE
+)
+```
+
+# Identification of available genome assemblies
+
+Publicly available genome assemblies of *Aureobasidium pullulans* were identified using the NCBI Assembly database using the organism-specific NCBI Taxonomy identifier (TaxID 5580).
+
+The search was performed programmatically using the NCBI Entrez API through the R package **rentrez**.
+
+All identified assemblies were retained for downstream analysis in order to maximize genomic diversity of the reconstructed proteome dataset.
+
+```{r assembly-search}
+taxid <- 5580
+
+assembly_search <- entrez_search(
+  db = "assembly",
+  term = paste0("txid", taxid, "[Organism:exp]"),
+  retmax = 1000
+)
+
+n_assemblies <- length(assembly_search$ids)
+cat(
+  "Number of identified genome assemblies:",
+  n_assemblies
+)
+```
+
+## Retrieval of assembly metadata
+
+```{r assembly-metadata}
+summaries <- entrez_summary(
+  db = "assembly",
+  id = assembly_search$ids
+)
+
+assemblies <- data.frame(
+  Assembly = sapply(
+    summaries, 
+    function(x) x$assemblyaccession
+    ),
+  Assembly_name = sapply(
+    summaries, 
+    function(x) x$assemblyname
+    ),
+  Organism = sapply(
+    summaries,
+    function(x) x$speciesname
+  ),
+  Assembly_type = sapply(
+    summaries, 
+    function(x) x$assemblytype
+    ),
+  Assembly_status = sapply(
+    summaries, 
+    function(x) x$assemblystatus
+    ),
+  FTP_GenBank = sapply(
+    summaries, 
+    function(x) x$ftppath_genbank
+    ),
+  stringsAsFactors = FALSE
+)
+
+kable(
+  head(assemblies,10),
+  caption="Metadata of representative Aureobasidium pullulans genome assemblies."
+)
+```
+
+# Genome assembly quality assessment using NCBI assembly statistics
+
+Genome assembly quality was evaluated using metadata retrieved from NCBI Assembly records. 
+
+The evaluated parameters included assembly level, sequencing coverage, contig N50 and scaffold N50 statistics.
+
+No assemblies were removed based only on assembly quality metrics because the objective was to include all available genomic resources for proteome reconstruction.
+
+```{r assembly-qc}
+assembly_QC <- data.frame(
+  Assembly = 
+    sapply(summaries, function(x) 
+      x$assemblyaccession),
+ 
+  Level = 
+    sapply(summaries, function(x) 
+      x$assemblystatus),
+  
+  Coverage = 
+    as.numeric(
+    sapply(summaries, function(x) 
+      x$coverage)
+    ),
+  
+  Contig_N50 = 
+    as.numeric(
+    sapply(summaries, function(x) 
+      x$contign50)
+    ),
+  
+  Scaffold_N50 = 
+    as.numeric(
+    sapply(summaries, function(x) 
+      x$scaffoldn50)
+    )
+)
+
+
+summary(
+  assembly_QC[
+    ,
+    c(
+      "Coverage",
+      "Contig_N50",
+      "Scaffold_N50"
+    )
+  ]
+)
+```
+
+A total of 93 genome assemblies were evaluated. Assembly levels included:
+
+- 3 chromosome-level assemblies
+
+- 65 contig-level assemblies
+
+- 25 scaffold-level assemblies
+
+Sequencing coverage ranged from 0.93x to 247x, with a median coverage of 50x.
+
+# Visualization of genome assembly quality
+
+To facilitate interpretation of the assembly quality, graphical summaries were generated showing the distribution of assembly levels, sequencing coverage and assembly continuity statistics. 
+
+```{r}
+library(ggplot2)
+
+ggplot(assembly_QC, aes(x = Level)) + geom_bar() +
+  labs(
+    title = "Distribution of Aureobasidium pullulans genome assemblies",
+    x = "Assembly level",
+    y = "Number of assemblies"
+  ) + theme_minimal(base_size = 14)
+```
+
+The majority of the retrieved genome assemblies were available at the contig level, whereas only three chromosome-level assemblies were identified.
+
+```{r}
+ggplot(assembly_QC, aes(x = Coverage)) +
+  geom_histogram(bins = 20, fill = "steelblue", color = "black") + 
+  labs(
+    title = "Distribution of sequencing coverage",
+    x = "Coverage (x)",
+    y = "Number of assemblies"
+  ) +
+  theme_minimal(base_size = 14)
+```
+
+Sequencing coverage varied substantially among the available assemblies, although most genomes exhibited moderate to high coverage.
+
+```{r}
+ggplot(assembly_QC, aes( x = Contig_N50)) +
+  geom_histogram(bins = 20, fill = "steelblue", color = "black") +
+  scale_x_log10() +
+  labs(
+    title = "Distribution of contig N50 values",
+    x = "Contig N50 (bp, log10 scale)",
+    y = "Number of assemblies"
+  ) +
+  theme_minimal(base_size = 14)
+```
+
+The distribution of contig N50 values demonstrates considerable variability in genome continuity among the retrieved assemblies.
+
+```{r}
+ggplot(assembly_QC, aes( x = Scaffold_N50)) +
+  geom_histogram(bins = 20, fill = "steelblue", color = "black") +
+  scale_x_log10() +
+  labs(
+    title = "Distribution of scaffold N50 values",
+    x = "Scaffold N50 (bp, log10 scale)",
+    y = "Number of assemblies"
+  ) +
+  theme_minimal(base_size = 14)
+```
+
+Similarly, scaffold N50 values varied widely across the dataset, reflecting differences in assembly contiguity among the available genome assemblies.
+
+Protein sequence availability was assessed separately using a Python workflow.
+
+The script automatically checked the presence of predicted protein FASTA files in the NCBI FTP repositories and generated an annotation availability summary table.
+
+
+```{r export-assemblies, include=FALSE}
+write.csv(assemblies,"assemblies.csv",row.names=FALSE)
+```
+
+# Summary of genome assembly retrieval
+
+Using the NCBI Assembly database, 93 publicly available *Aureobasidium pullulans* genome assemblies were identified.
+
+All assemblies were retained to maximize genomic diversity. Assembly quality assessment showed substantial variability in genome continuity and sequencing coverage, which was expected due to differences in sequencing technologies and assembly strategies.
+
+These genome assemblies were subsequently evaluated for availability of predicted protein sequences and used for construction of a combined proteome dataset.
+
+# Construction of the Aureobasidium pullulans combined proteome dataset
+
+The initial genomic dataset consisted of 93 publicly available *Aureobasidium pullulans* genome assemblies identified from the NCBI Assembly database. 
+
+Because not all genome assemblies contain directly available predicted protein sequences, an annotation availability assessment was performed prior to proteome reconstruction.
+
+The objective of this step was to identiy the most reliable source of protein sequences while maintaining consistency between genome assemblies.
+
+Two possible approaches were considered: 
+
+1. Direct retrieval of predicted protein FASTA files ('.faa') containing translated protein sequences generated during genome annotation.
+
+2. Retrieval of GenBank annotation files ('.gbff') as a potential source of annotated coding sequences.
+
+The workflow was performed using a combination of R and Python. R was used for retrieval and statistical analysis of assembly metadata, whereas Python was used for automated FTP inspection and downloading because of the large number of assemblies.
+
+The Python workflow consisted of:
+
+- reading the assembly metadata generated during the NCBI assembly retrieval step in R;
+
+- checking the availability of protein FASTA and GenBank annotation files;
+
+- downloading available protein and annotation files from NCBI FTP repositories;
+
+- generating summary table describing annotation availability for each assembly.
+
+```{r annotation-summary}
+annotation <- read.csv("Aureobasidium-pullulans-proteome/results/annotation_availability.csv")
+
+knitr::kable(
+  head(annotation),
+  caption="Representative examples of annotation availability among genome assemblies."
+)
+```
+
+## Assessment of protein sequence availability
+
+Among the 93 identified *Aureobasidium pullulans* genome assemblies, directly available predicted protein FASTA files ('*_protein.faa.gz') were identified for 60 assemblies.
+
+These protein FASTA files were downloaded from the NCBI FTP repository and used directly for construction of the combined proteome dataset. 
+
+For the remaining 33 assemblies, only GenBank annotation files ('*.gbff') were available. These files were inspected as a potential alternative source of protein sequences. However, representative GBFF files did not consistently contain annotated coding sequences (CDS) with translated protein products, meaning that protein extraction from these assemblies would require an additional indenpendent gene prediction and annotation step.
+
+To ensure consistency of protein sequence annotation across the dataset, only assemblies with directly available predicted protein FASTA files were used for construction of the combined proteome dataset.
+
+
+```{r annotation-summary2}
+annotation_summary <- dplyr::count(annotation, Status)
+knitr::kable(
+  annotation_summary,
+  caption="Availability of predicted protein FASTA and GenBank annotation files among identified genome assemblies."
+)
+```
+
+```{r annotation-plot}
+ggplot(annotation_summary,
+       aes(x = Status, y = n)) +
+  geom_col() +
+  theme_classic() +
+  labs(
+    title="Annotation availability among A. pullulans genome assemblies",
+  x = "Annotation type",
+  y = "Number of assemblies")
+```
+
+
+
+# Construction of the combined protein dataset
+
+The protein FASTA files obtained from the 60 annotated genome assemblies containing available predicted protein sequences were combined into a single protein dataset.
+
+All protein sequences were concatenated into one FASTA file, representing the complete collection of publicly available predicted proteins from *Aureobasidium pullulans* assemblies included in this analysis.
+
+The resulting combined dataset contained **631,796 protein sequences** and represented the initial protein collection used for subsequent redndancy removal and protein clustering analyses.
+
+
+```{r proteome-summary}
+proteome_summary <- data.frame(
+  Assemblies_used = 60,
+  Total_proteins = 631796,
+  Average_proteins_per_assembly = round(631796/60)
+)
+
+knitr::kable(
+  proteome_summary,
+  caption = "Summary of reconstructed combined protein dataset."
+)
+```
+
+```{r proteome-loading, include=FALSE}
+proteome <- readAAStringSet(
+  "Aureobasidium-pullulans-proteome/results/proteome/A_pullulans_combined_proteome.faa"
+)
+
+protein_lengths <- width(proteome)
+
+```
+
+```{r proteome-statistics}
+proteome_statistics <- data.frame(
+  Total_proteins = length(proteome),
+  Minimum_length = min(protein_lengths),
+  Median_length = median(protein_lengths),
+  Mean_length = round(mean(protein_lengths),1),
+  Maximum_length = max(protein_lengths)
+)
+
+knitr::kable(
+  proteome_statistics,
+  caption="Summary of protein sequence lengths in the combined proteome dataset."
+)
+```
+
+
+
+# Removal of redundant protein sequences
+
+Because proteins sequences were collected from multiple genome assemblies of the same species, the combined dataset contained substantial sequence redundancy caused by identical protein predictions occurring across different assemblies. 
+
+To reduce computational complexity while preserving biological diversity, identical protein sequences were removed before downstream analyses.
+
+Redundancy removal was performed using **seqkit rmdup**, which identifies completely identical amino acid sequences and retains a single representative sequence from each identical group. 
+
+The dataset was reduced from **631,796** protein sequences to **380,872** unique protein sequences. 
+
+This step reduces computational complexity for downstream analyses while preserving all unique protein sequences present in the available genome assemblies.
+
+```{r redundancy-summary}
+redundancy_summary <- data.frame(
+  Combined_proteins = 631796,
+  Unique_proteins = 380872,
+  Removed_duplicates = 631796 - 380872,
+  Percent_removed = round((631796-380872) / 631796*100,1)
+)
+
+knitr::kable(
+  redundancy_summary,
+  capiton="Summary of redundancy removal from the combined protein dataset."
+)
+```
+
+631,796 - 380,872 = **250,924 proteins**
+
+Approximately **39.7%** of the initial protein sequences were removed as exact duplicates, indicating substantial redundancy among protein predictions generated from different *Aureobasidium pullulans* genome assemblies.
+
+# Protein length distribution
+
+Before downstream protein clustering and functional analyses, the length distribution of the non-redundant protein dataset was evaluated. Protein length analysis provides an overview of the quality of predicted protein sequences and allows detection of extremely short sequences that may represent fragmented gene predictions or incomplete annotations.
+
+```{r protein-length-import}
+protein_duzina <- read.delim(
+  "Aureobasidium-pullulans-proteome/results/redundancy/protein_lengths.tsv",
+  header = FALSE,
+  stringsAsFactors = FALSE
+)
+
+colnames(protein_duzina) <- c("Protein","Sequence","Quality","Length")
+
+nrow(protein_duzina)
+
+```
+
+The non-redundant dataset contained 380,872 protein sequences. Protein lengths were summarized usig basic descriptive statistics.
+
+
+```{r protein-length-summary}
+summary(protein_duzina$Length)
+```
+
+```{r protein-length-distribution, fig.width=7, fig.height=5}
+ggplot(protein_duzina, aes(x = Length)) +
+  geom_histogram(
+    bins = 50,
+    fill = "steelblue",
+    color = "black"
+  ) +
+  xlim(0,1000) +
+  labs(
+    title = "Distribution of protein sequence lengths",
+    x = "Protein length (amino acids)",
+    y = "Number of proteins"
+  ) + 
+  theme_minimal(base_size=14)
+```
+
+```{r short-protein-analysis}
+short_proteins <- subset( 
+  protein_duzina,
+  Length < 50
+)
+
+nrow(short_proteins)
+```
+
+```{r short-protein-summary}
+protein_length_summary <- data.frame(
+  Total_proteins = nrow(protein_duzina),
+  Proteins_less_than_50aa = nrow(short_proteins),
+  Percentage = round(
+    nrow(short_proteins) / nrow(protein_duzina) * 100,3
+  )
+)
+
+knitr::kable(
+  protein_length_summary,
+  caption = "Summary of short protein sequences in the non-redundant proteome."
+)
+```
+
+The non-redundant proteome consisted of **380,872** protein sequences. Protein lengths ranged from 6 to 5,563 amino acids, with a median length of 432 amino acids.
+
+Only **88 proteins sequences (0.023% of the dataset)** were shorter than 50 amino acids, indicating that extremely short predicted proteins represent a negligible fracion of the dataset. Therefore, no filtering based on protein length was applied before subsequent clustering and functional analyses.
+
+# Removal of short protein sequences
+
+Extremely short protein sequences may represent fragmented gene predictions, incomplete annotations or partial protein models. To reduce the presence of potential annotation artefacts, protein sequences shorter than **50 amino acids** were removed before protein clustering.
+
+Because only a small number of sequences fulfilled this criterion, this filtering step had minimal impact on the overall composition of the proteom dataset.
+
+```{r short-protein-filtering}
+summary_of_protein <- data.frame(
+  Before_filtering = 380872,
+  Proteins_under_50aa = 88,
+  After_filtering = 380784
+)
+
+knitr::kable(
+  summary_of_protein,
+  caption = "Summary of filtering of extremely short protein sequences."
+)
+```
+
+The filtering step removed **88 protein sequences**, resulting in a final dataset of **380,784**. The filtered dataset was subsequently used for protein clustering with CD-HIT to reduce redundancy among highly similar protein sequences.
+
+# Clustering of protein sequences
+
+To reduce redundancy among highly similar proteins originating from multiple *Aureobasidium pullulans* genome assemblies, the filtered protein dataset was clustered using CD-HIT with a sequence identity threshold of **90%**. One representative protein sequence was retained from each cluster and used for all subsequent analyses.
+
+```{r cdhit-summary}
+cdhit_summary <- data.frame(
+  Input_sequences = 380784,
+  Representative_sequences = 48969,
+  Reduction = round(
+    (1-48969 / 380784) * 100,
+    2
+  )
+)
+
+knitr::kable(
+  cdhit_summary,
+  caption = "Summary of CD-HIT clustering results."
+)
+```
+
+CD-HIT clustering reduced the dataset from **380,784** protein sequences to **48,969 representative sequences**, corresponding to an **87.14% reduction** in redundancy. These representative sequences were subsequently compared against UniProt in order to identify proteins with experimentally curated identifiers.
+
+# Protein identification using UniProt similarity search
+
+The representative protein sequences obtained after CD-HIT clustering were compared against the *Aureobasidium pullulans* regerence proteome using DIAMOND BLASTP.
+
+DIAMOND was selected because it provides a computationally efficient alternative to BLASTP while maintaining high sensitivity for large protein datasets.
+
+The purpose of this analysis was to identify the closest UniProt accession for each representative protein sequence, since AlphaFold Protein Structure Databse indexes predicted structures using UniProt accession numbers rather than genome-specific protein identifiers.
+
+For each representative protein, only the best-scoring UniProt hit was retained for dowstream analyses.
+
+
+```{r diamond-import}
+diamond_results <- read.delim(
+  "Aureobasidium-pullulans-proteome/results/diamond/cdhit_vs_reference.tsv",
+  header = FALSE
+)
+
+colnames(diamond_results) <- c("Protein_ID","UniProt_ID","Identity","Alignment_length","E_value","Bit_score")
+```
+
+```{r diamond-summary}
+diamond_summary <- data.frame(
+  Total_representative_proteins = 48969,
+  DIAMOND_matches = nrow(diamond_results),
+  Percentage_matched = round(
+    nrow(diamond_results)/48969*100,
+    2
+  )
+)
+
+knitr::kable(
+  diamond_summary,
+  caption = "Summary of UniProt identification using DIAMOND BLASTP."
+)
+```
+
+```{r histogram-identity}
+ggplot(diamond_results,
+       aes(x = Identity)) +
+  geom_histogram(
+    bins = 50,
+    fill = "steelblue",
+    color = "black"
+  ) +
+  labs(
+    title="Distribution of sequence identity of UniProt matches",
+    x = "Sequence identity (%)",
+    y = "Number of proteins"
+  ) +
+  theme_minimal()
+```
+
+```{r histogram-evalue}
+
+diamond_results$minusLogE <- -log10(diamond_results$E_value)
+
+ggplot(diamond_results,
+       aes(x = minusLogE)) +
+  geom_histogram(
+    bins = 50,
+    fill = "steelblue",
+    color = "black"
+  ) +
+  labs(
+    title="Distribution of DIAMOND alignment significance",
+    x = "-log10(E-value)",
+    y = "Number of proteins"
+  ) + 
+  theme_minimal()
+```
+
+```{r include=FALSE}
+#broj jedinstvenih UniProt proteina
+length(unique(diamond_results$UniProt_ID))
+
+summary(diamond_results$Identity)
+
+summary(diamond_results$Alignment_length)
+```
+
+The DIAMOND BLASTP search identified significant similarity matches for 34,637 representative protein sequences, corresponding to approximately 70.7% of the clustered dataset. These matches enabled reliable mapping of representative proteins to UniProt accession identifiers, which were subsequently used for AlphaFold structure retrieval.
+
+```{r diamond-quliaty}
+diamond_quality <- data.frame(
+  Statistic = c(
+    "Number of DIAMOND hits",
+    "Unique UniProt proteins",
+    "Mean sequence identity",
+    "Median sequence identity",
+    "Mean alignment length",
+    "Median alignment length"
+  ),
+  Value = c(
+    nrow(diamond_results),
+    length(unique(diamond_results$UniProt_ID)),
+    round(mean(diamond_results$Identity),2),
+    median(diamond_results$Identity),
+    round(mean(diamond_results$Alignment_length),2),
+    median(diamond_results$Alignment_length)
+  )
+)
+
+knitr::kable(
+  diamond_quality,
+  caption="Summary of DIAMOND BLASTP identification results."
+)
+```
+
+```{r diamond-results}
+diamond_results$UniProt_accession <- sub(
+  ".*\\|(.*)\\|.*",
+  "\\1",
+  diamond_results$UniProt_ID
+)
+```
+
+# Identification of available AlphaFold structures
+
+The UniProt accession numbers obtained from the DIAMOND similarity search were used to identify available protein structure predictions in the AlphaFold Protein Structure Database. 
+
+Since AlphaFold indexes protein models exclusively by UniProt accession numbers, successful mapping of representative protein sequences to UniProt represented a prerequisite for structural analysis.
+
+During the development of the workflow, direct queries of AlphaFold public API using UniProt accessions obtained from the reference proteome frequently returned no results, despite corresponding protein models being available through the AlphaFold web interface. This discrepancy indicated that not all UniProt identifiers from the reference proteome were represented by the API. 
+
+To overcome this limitation, all currently available AlphaFold models for *Aureobasidium pullulans* were retrieved independently from AlphaFold DB. The retrieved models were subsequently matched against the representative UniProt accessions identified by DIAMOND, ensuring that all currently available AlphaFold strctures were included in the analysis.
+
+## Selection of high-confidence UniProt matches
+
+To minimize ambiguous protein assignments, only high-confidence similarity matches were retained for AlphaFold structure identification. Mathces were required to satisfy the following criteria:
+
+- sequence identity >=70%
+
+- alignment length >=200 amino acids
+
+- E-value <=1*10^-20
+
+```{r high-confidence}
+high_confidence <- subset(
+  diamond_results,
+  Identity >= 70 &
+    Alignment_length >= 200 &
+    E_value <= 1e-20
+)
+
+nrow(high_confidence)
+```
+
+```{r echo=TRUE, results='hide'}
+high_confidence$UniProt_accession <- sub(
+  ".*\\|(.*)\\|.*",
+  "\\1",
+  high_confidence$UniProt_ID
+)
+```
+
+
+
+```{r include=FALSE}
+alphafold_input <- data.frame(
+  UniProt_accession = unique(diamond_results$UniProt_accession)
+)
+
+write.table(
+  alphafold_input,
+  "Aureobasidium-pullulans-proteome/results/alphafold_uniprot_ids.txt",
+  row.names = FALSE,
+  col.names = FALSE,
+  quote = FALSE
+)
+```
+
+
+
+```{r include=FALSE}
+# export protein ids with high-confidence uniprot matches
+write.table(
+  high_confidence$Protein_ID,
+  "Aureobasidium-pullulans-proteome/results/high_confidence_ids.txt",
+  row.names = FALSE,
+  col.names = FALSE,
+  quote = FALSE
+)
+```
+
+
+
+```{r include=FALSE}
+write.csv(
+  high_confidence,
+  "Aureobasidium-pullulans-proteome/results/high_confidence_protein_annotations.csv",
+  row.names = FALSE
+)
+```
+
+
+```{r}
+high_conf_summary <- data.frame(
+  Statistic = c(
+    "High-confidence representative proteins",
+    "Unique UniProt proteins"
+  ),
+  Value = c(
+    length(unique(high_confidence$Protein_ID)),
+    length(unique(high_confidence$UniProt_ID))
+  )
+)
+
+knitr::kable(
+  high_conf_summary,
+  caption="Summary of high-confidence UniProt matches."
+)
+```
+
+Application of the filtering criteria resulted in **18,396 representative proteins** corresponding to **8,224 unique UniProt proteins**. These proteins were subsequently used to identify representative UniProt accessions for AlphaFold structure retrieval.
+
+## Selection of representative UniProt accessions
+
+Because several representative proteins could map to the same UniProt protein, only one representative alignment was retained for each UniProt accession. The representative protein was selected according to the highest DIAMOND bit score.
+
+```{r besthits}
+best_hits <- high_confidence[
+  order(
+    high_confidence$Bit_score,
+    decreasing = TRUE
+  ),
+]
+
+best_hits <- best_hits[
+  !duplicated(best_hits$UniProt_ID),
+]
+
+nrow(best_hits)
+```
+
+After removal of duplicated UniProt matches, **8,224 representative UniProt proteins** remained for comparision with the AlphaFold Protein Structure Database.
+
+```{r include=FALSE}
+write.table(
+  best_hits$UniProt_accession,
+  "Aureobasidium-pullulans-proteome/results/alphafold/A_pullulans_candidate_uniprot_ids.txt",
+  quote = FALSE,
+  row.names = FALSE,
+  col.names = FALSE
+)
+```
+
+```{r include=FALSE}
+write.csv(
+  best_hits,
+  "Aureobasidium-pullulans-proteome/results/diamond/best_reference_matches.csv",
+  row.names = FALSE
+)
+```
+
+# Retrieval of AlphaFold models
+
+All currently available AlphaFold protein strcutre prediction for *Aureobasidium pullulans* were retrieved independently from AlphaFold DB. The downaloaded dataset contained UniProt accession numbers, AlphaFold model identifiers and corresponding pLDDT confidence scores.
+
+
+```{r}
+alphafold <- read.csv(
+  "Aureobasidium-pullulans-proteome/results/alphafold/all_reference_alphafold.csv"
+)
+nrow(alphafold)
+```
+
+A total of **47 AlphaFold protein models** were available for *Aureobasidium pullulans*.
+
+```{r}
+alphafold_summary <- data.frame(
+  Available_AlphaFold_models = nrow(alphafold)
+)
+
+knitr::kable(
+  alphafold_summary,
+  caption="Available AlphaFold protein models."
+)
+```
+
+# Identification of proteins with available AlphaFold structures
+
+The representative UniProt proteins identified by DIAMOND were compared with the retrieved AlphaFold dataset. Only proteins present in both datasets were retained for downstream structural analyses.
+
+
+```{r}
+final_AF <- merge(
+  best_hits,
+  alphafold,
+  by.x = "UniProt_accession",
+  by.y = "accession"
+)
+nrow(final_AF)
+```
+
+Comparison with the AlphaFold dataset identified **16 representative proteins** for which predicted three-dimensional structures were available.
+
+```{r}
+match_summary <- data.frame(
+  Statistic = c(
+    "Representative UniProt proteins",
+    "Available AlphaFold models",
+    "Matches proteins"
+  ),
+  Value = c(
+    8224,
+    47,
+    nrow(final_AF)
+  )
+)
+
+knitr::kable(
+  match_summary,
+  caption="Summary of AlphaFold structure identification."
+)
+```
+
+# Functional annotation of proteins with available AlphaFold structures
+
+Functional annotations were retrieved from UniProt for all proteins with available AlphaFold structure predictions.
+
+Protein names, gene identifiers and protein lengths were combined with DIAMOND similarity results and AlphaFold confidence scores to generate the final dataset used for downstream functional analyses.
+
+```{r}
+annotations <- read.csv(
+"Aureobasidium-pullulans-proteome/results/alphafold/uniprot_annotations.csv"
+)
+
+final_table <- merge(
+  final_AF,
+  annotations,
+  by="UniProt_accession"
+)
+
+nrow(final_table)
+```
+
+The integration of AlphaFold prediction with UniProt functional annotations resulted in a final dataset containing **16 proteins** with available structural models and corresponding biological annotations.
+
+## Final protein dataset used for downstream analysis
+
+The final dataset contains UniProt accession numbers, protein annotations, gene identifiers, sequence lengths, sequence similarity statistics and AlphaFold confidence scores.
+
+```{r include = FALSE}
+write.csv(
+  final_table,
+  "Aureobasidium-pullulans-proteome/results/alphafold/final_alphafold_protein.csv",
+  row.names = FALSE
+)
+```
+
+```{r}
+knitr::kable(
+  final_table[
+    ,
+    c(
+      "UniProt_accession",
+      "Protein_name",
+      "Gene",
+      "Length",
+      "Identity",
+      "pLDDT"
+    )
+  ],
+  digits=2,
+  caption="Final set of proteins with available AlphaFold structures and UniProt annotations."
+)
+```
+
+## Structural confidence assessment
+
+The quality of AlphaFold predictions was evaluated using the predicted Local Distance Difference Test (pLDDT) score.
+
+The pLDDT score ranges from 0 to 100, where higher values indicate greater confidence in the predicted protein structure. Protein models with pLDDT values above 70 were considered suitable for downstream structural interpretation.
+
+```{r}
+quality_summary <- data.frame(
+  Statistic = c(
+    "Number of proteins",
+    "Mean sequence identity (%)",
+    "Median sequence identity (%)",
+    "Mean pLDDT score",
+    "Median pLDDT score",
+    "Minimum pLDDT score",
+    "Maximum pLDDT score"
+  ),
+  Value = c(
+    nrow(final_table),
+    round(mean(final_table$Identity),2),
+    median(final_table$Identity),
+    round(mean(final_table$pLDDT),2),
+    median(final_table$pLDDT),
+    min(final_table$pLDDT),
+    max(final_table$pLDDT)
+  )
+)
+
+knitr::kable(
+  quality_summary,
+  caption = "Summary of sequence similarity and AlphaFold structural confidence."
+)
+```
+
+All identified AlphaFold models satisfied the predefined quality threshold, with pLDDT values ranging from **78.56 to 97.06**.
+
+The average pLDDT score was **89.38**, indicating high-confidence structural predictions for the final protein set.
+
+```{r include=FALSE}
+write.table(
+  final_table$UniProt_accession,
+  "Aureobasidium-pullulans-proteome/results/alphafold/final_uniprot_ids.txt",
+  quote = FALSE,
+  row.names = FALSE,
+  col.names = FALSE
+)
+```
+
+# Functional annotation of proteins with available AlphaFold structures
+
+Functional annotation of proteins with available AlphaFold structure predictions was performed using eggNOG-mapper.
+
+The annotation included fnctional descriptions, predicted protein names, KEGG Orthology (KO) identifiers, KEGG pathway assignments and Gene Ontology (GO) annotations. These annotations were integrated with the final AlphaFold dataset to enable biological interpretation of the identified proteins.
+
+```{r eggnog-import}
+eggnog <- read.delim(
+  "Aureobasidium-pullulans-proteome/results/eggnog/A_pullulans_AF16.emapper.annotations",
+  comment.char = "#",
+  header = FALSE
+)
+
+colnames(eggnog) <- c(
+  "query",
+  "seed_ortholog",
+  "evalue",
+  "score",
+  "eggNOG_OGs",
+  "max_annot_lvl",
+  "COG_category",
+  "Description",
+  "Preferred_name",
+  "GOs",
+  "KEGG_ko",
+  "KEGG_Pathway",
+  "KEGG_Module",
+  "KEGG_Reaction",
+  "KEGG_rclass",
+  "BRITE",
+  "KEGG_TC",
+  "CAZy",
+  "BiGG_Reaction",
+  "PFAMs"
+)
+
+```
+
+## Integration of functional annotations
+
+The eggNOG annotations were merged with the AlphaFold dataset using UniProt identifiers obtained during the DIAMOND similarity search.
+
+
+```{r merge-annotations}
+final_annotation <- merge(
+    final_table,
+    eggnog,
+    by.x = "UniProt_ID",
+    by.y = "query"
+)
+
+```
+
+The resulting dataset contained functional annotations for all proteins with available AlphaFold structural models.
+
+```{r annotation-table}
+annotation_table <- final_annotation[
+,
+c(
+"UniProt_accession",
+"Protein_name",
+"Preferred_name",
+"Description",
+"KEGG_ko",
+"KEGG_Pathway",
+"pLDDT"
+)
+]
+
+knitr::kable(
+  annotation_table,
+  digits = 2,
+  caption="Functional annotation of proteins with available AlphaFold structures."
+)
+```
+
+```{r export-annotation, include = FALSE}
+write.csv(
+    annotation_table,
+    "Aureobasidium-pullulans-proteome/results/eggnog/annotation_table.csv",
+    row.names = FALSE
+)
+```
+
+## KEGG functional classification
+
+To facilitate biological interpretation, proteins were classified into broad functional categories according to their assigned KEGG Orthology identifiers.
+
+```{r kegg-preparation}
+kegg <- final_annotation[,c("UniProt_accession","Protein_name","KEGG_Pathway")]
+
+kegg_long <- separate_rows(kegg, KEGG_Pathway, sep = ",")
+
+```
+
+
+```{r kegg-categories}
+kegg_categories <- kegg_long %>%
+  mutate(
+    Category = case_when(
+      
+      KEGG_Pathway %in% c(
+        "ko:K02984",
+        "ko:K02985",
+        "ko:K02938",
+        "ko:K02877"
+      ) ~ "Transplation",
+      
+      KEGG_Pathway %in% c(
+        "ko:K03257",
+        "ko:K13025"
+      ) ~ "RNA metabolism",
+      
+      KEGG_Pathway %in% c(
+        "ko:K05692",
+        "ko:K07375"
+      ) ~ "Cytoskeleton",
+      
+      KEGG_Pathway %in% c(
+        "ko:K07893",
+        "ko:K07904",
+        "ko:K07905",
+        "ko:K07937",
+        "ko:K07941",
+        "ko:K07977"
+      ) ~ "Vesicle trafficking",
+      
+      KEGG_Pathway %in% c(
+        "ko:K04513",
+        "ko:K04536",
+        "ko:K07975",
+        "ko:K14753"
+      ) ~ "Signal transduction",
+      
+      KEGG_Pathway == "ko:K02735" ~ "Protein degradation",
+      
+      TRUE ~ "Other"
+    )
+  )
+
+```
+
+```{r category-summary}
+category_summary <- kegg_categories %>%
+  group_by(Category) %>%
+  summarise(Proteins=n()) %>%
+  arrange(desc(Proteins))
+
+knitr::kable(
+  category_summary,
+  caption="Functional classification of proteins according to KEGG Orthology."
+)
+```
+
+The identified proteins were mainly associated with translation, vesicle trafiicking, signal transduction, RNA metabolism, cytoskeleton organization and protein degradation.
+
+
+```{r kegg-plot, fid.width=7, fig.height=5}
+ggplot(
+  category_summary,
+       aes(
+         x = reorder(Category, Proteins),
+           y = Proteins
+         )
+  ) +
+  geom_col(fill = "steelblue") +
+  coord_flip() +
+  labs(
+    title = "Functional categories of proteins with available AlphaFold structures",
+    x = "",
+    y = "Number of proteins"
+  ) +
+  theme_minimal(base_size = 14)
+```
+
+```{r export-kegg, include=FALSE}
+write.csv(
+  kegg_categories,
+  "Aureobasidium-pullulans-proteome/results/kegg_functional_categories.csv",
+  row.names = FALSE
+)
+```
+
+## Summary of functional annotation
+
+Functional annotation demonstrated that the proteins with available AlphaFold structural models participate primarily in essential cellular processes.
+
+The largest functional category corresponded to proteins involved in translation, including both ribosomal proteins and translation-associated factors. Additional proteins were associated with vesicle trafficking, RNA metabolism, cytoskeleton organization, signal transduction and protein degradation.
+
+Although only sixteen proteins currently possess available AlphaFold models for *Aureobasidium pullulans*, these proteins represent fundamental cellular functions that are highlt conserved among fungi and therefore provide a valuable starting point for future structural and functional studies.
+
+
+
+
