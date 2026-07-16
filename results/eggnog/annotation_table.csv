@@ -1,0 +1,17 @@
+"UniProt_accession","Protein_name","Preferred_name","Description","KEGG_ko","KEGG_Pathway","pLDDT"
+"A0A1A7MJ80","ADP-ribosylation factor","ARF1","Belongs to the small GTPase superfamily. Arf family","-","ko:K07937,ko:K07977",78.56
+"A0A1A7MQX0","Uncharacterized protein","ACT1","Belongs to the actin family","-","ko:K05692",94.56
+"A0A1A7MSJ1","Small ribosomal subunit protein eS1","RPS1","Belongs to the eukaryotic ribosomal protein eS1 family","-","ko:K02984",86.62
+"A0A1A7MT36","Uncharacterized protein","YPT31","Rab subfamily of small GTPases","-","ko:K07904,ko:K07905",82.88
+"A0A4S8WAD4","Proteasome subunit beta","PUP3","Proteasome subunit","3.4.25.1","ko:K02735",97.06
+"A0A4S8ZPW6","Uncharacterized protein","RHO1","Belongs to the small GTPase superfamily. Rho family","-","ko:K04513,ko:K07975",91.69
+"A0A4S9BKZ2","Uncharacterized protein","-","Belongs to the small GTPase superfamily. Arf family","-","ko:K07941",88.81
+"A0A4S9C0M7","Uncharacterized protein","STE4","WD domain, G-beta repeat","-","ko:K04536",94.12
+"A0A4S9E1S8","Ribosomal protein L15","rpl15","Belongs to the eukaryotic ribosomal protein eL15 family","-","ko:K02877",96.12
+"A0A4S9NQN6","Tubulin beta chain","TUB2","Tubulin is the major constituent of microtubules. It binds two moles of GTP, one at an exchangeable site on the beta chain and one at a non-exchangeable site on the alpha chain","-","ko:K07375",88.81
+"A0A4S9V848","40S ribosomal protein S3","RPS3","Belongs to the universal ribosomal protein uS3 family","-","ko:K02985",86.69
+"A0A4S9VC37","ATP-dependent RNA helicase eIF4A","TIF1","Belongs to the DEAD box helicase family","-","ko:K03257",87.25
+"A0A4S9W8N5","Uncharacterized protein","cpc2","WD domain, G-beta repeat","-","ko:K14753",89.62
+"A0A4S9WTE7","Uncharacterized protein","ryh1","Rab subfamily of small GTPases","-","ko:K07893",83.44
+"A0A4T0BF95","Uncharacterized protein","RPL2","60S ribosomal protein","-","ko:K02938",95.81
+"A0A4T0CKX7","RNA helicase","FAL1","Belongs to the DEAD box helicase family","3.6.4.13","ko:K13025",88

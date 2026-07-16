@@ -1,0 +1,25 @@
+## Wed Jul 15 16:40:16 2026
+## emapper-2.1.13-73d0f2f
+## /opt/anaconda3/envs/eggnog/bin/emapper.py -i results/alphafold/final_proteins.faa --output A_pullulans_AF16 --output_dir results/eggnog --cpu 4 --itype proteins
+##
+##/opt/anaconda3/envs/eggnog/bin/diamond blastp -d '/opt/anaconda3/envs/eggnog/lib/python3.10/site-packages/data/eggnog_proteins.dmnd' -q '/Users/zoranamicic/Desktop/diplomski rad/Aureobasidium-pullulans-proteome/results/alphafold/final_proteins.faa' --threads 4 -o '/Users/zoranamicic/Desktop/diplomski rad/Aureobasidium-pullulans-proteome/results/eggnog/A_pullulans_AF16.emapper.hits' --tmpdir '/Users/zoranamicic/Desktop/diplomski rad/Aureobasidium-pullulans-proteome/emappertmp_dmdn_5toxdaj7' --sensitive --iterate -e 0.001 --top 3  --outfmt 6 qseqid sseqid pident length mismatch gapopen qstart qend sstart send evalue bitscore qcovhsp scovhsp
+#qseqid	sseqid	evalue	bitscore	qstart	qend	sstart	send	pident	qcov	scov
+tr|A0A4T0CKX7|A0A4T0CKX7_AURPU	43229.XP_007725841.1	1.4e-280	768.0	1	400	1	400	97.3	100.0	100.0
+tr|A0A4S9WTE7|A0A4S9WTE7_AURPU	34373.CCU75854	3.38e-116	336.0	1	206	1	208	84.2	100.0	100.0
+tr|A0A1A7MQX0|A0A1A7MQX0_AURPU	97096.XP_007799245.1	1.43e-274	750.0	1	375	1	375	98.9	100.0	100.0
+tr|A0A4S9BKZ2|A0A4S9BKZ2_AURPU	101162.XP_007684639.1	9.5e-114	328.0	1	181	1	181	88.4	98.9	97.8
+tr|A0A4S8WAD4|A0A4S8WAD4_AURPU	93612.XP_008031341.1	1.52e-143	405.0	1	205	1	205	96.1	100.0	100.0
+tr|A0A4S9E1S8|A0A4S9E1S8_AURPU	86049.XP_008725811.1	1.29e-134	382.0	1	203	1	203	93.1	100.0	100.0
+tr|A0A4S9VC37|A0A4S9VC37_AURPU	1173701.A0A066XPI8	1.43e-273	749.0	4	395	5	396	97.4	99.2	99.0
+tr|A0A4S9C0M7|A0A4S9C0M7_AURPU	430998.XP_007674737.1	3.27e-220	611.0	1	351	1	351	86.3	100.0	100.0
+tr|A0A4S9V848|A0A4S9V848_AURPU	61459.XP_007778863.1	2.16e-158	447.0	1	243	1	243	95.9	91.0	90.7
+tr|A0A4S8ZPW6|A0A4S8ZPW6_AURPU	101852.XP_008076777.1	3.27e-122	350.0	1	195	1	196	88.8	100.0	100.0
+tr|A0A4T0BF95|A0A4T0BF95_AURPU	5180.EDN91195	1.88e-175	489.0	1	254	1	254	95.3	100.0	100.0
+tr|A0A1A7MT36|A0A1A7MT36_AURPU	101852.XP_008086283.1	2.83e-127	364.0	1	213	1	213	89.7	100.0	100.0
+tr|A0A1A7MJ80|A0A1A7MJ80_AURPU	93612.XP_008030030.1	2.13e-130	370.0	1	183	1	183	98.9	100.0	100.0
+tr|A0A4S9W8N5|A0A4S9W8N5_AURPU	93612.XP_008020415.1	6.32e-205	569.0	1	316	1	316	97.5	100.0	100.0
+tr|A0A1A7MSJ1|A0A1A7MSJ1_AURPU	83344.XP_007927383.1	1.45e-164	462.0	1	255	1	257	93.0	100.0	100.0
+tr|A0A4S9NQN6|A0A4S9NQN6_AURPU	1047171.Mycgr3P102950	8.72e-315	858.0	1	447	1	448	95.5	100.0	100.0
+## 16 queries scanned
+## Total time (seconds): 0.018809080123901367
+## Rate: 850.65 q/s
